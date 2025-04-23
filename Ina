@@ -1,0 +1,21 @@
+status = processor.check_transaction(tx_hash)
+
+    else:
+
+        processor = EVMProcessor(network=network)
+
+        status = processor.check_transaction(tx_hash)
+
+    
+
+    # بروزرسانی موجودی
+
+    if status:
+
+        user = User.query.get(transaction.user_id)
+
+        user.balance += transaction.amount
+
+        db.session.commit()
+
+        notify_user(user.id, user.balance)

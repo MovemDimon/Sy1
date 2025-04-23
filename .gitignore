@@ -1,0 +1,32 @@
+# فایل‌های لاگ و کش
+*.log
+*.sqlite3
+
+# محیط مجازی پایتون
+venv/
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# فایل‌های وابسته به داکر هست
+Dockerfile
+docker-compose.yml
+docker-compose.override.yml
+
+# فایل‌های باینری و خروجی کامپایل
+*.so
+*.dll
+*.exe
+*.o
+*.a
+
+# فایل‌های CI/CD موقتی
+.github/workflows/*.log
+.github/workflows/__pycache__/
+
+# تنظیمات محلی و وابسته به سیستم
+*.db
+.idea/
+.vscode/

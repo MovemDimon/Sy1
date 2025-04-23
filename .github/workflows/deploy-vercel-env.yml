@@ -1,0 +1,46 @@
+name: Set Vercel Environment Variables
+
+on:
+  push:
+    branches:
+      - System-payment  # شاخه‌ای که رویش تغییرات اعمال می‌شود
+
+jobs:
+  update-vercel-env:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set Vercel Environment Variables
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          FLASK_SECRET: ${{ secrets.FLASK_SECRET }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ETH_RPC_URL: ${{ secrets.ETH_RPC_URL }}
+          BSC_RPC_URL: ${{ secrets.BSC_RPC_URL }}
+          TON_RPC_URL: ${{ secrets.TON_RPC_URL }}
+          TON_API_KEY: ${{ secrets.TON_API_KEY }}
+          USDT_ETH_CONTRACT: ${{ secrets.USDT_ETH_CONTRACT }}
+          USDT_TON_CONTRACT: ${{ secrets.USDT_TON_CONTRACT }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CELERY_BROKER_URL: ${{ secrets.CELERY_BROKER_URL }}
+          TON_MERCHANT_WALLET: ${{ secrets.TON_MERCHANT_WALLET }}
+          ETH_MERCHANT_WALLET: ${{ secrets.ETH_MERCHANT_WALLET }}
+        run: |
+          # گرفتن ID پروژه در Vercel
+          PROJECT_ID=$(curl -s -H "Authorization: Bearer $VERCEL_TOKEN" https://api.vercel.com/v9/projects | jq -r '.projects[] | select(.name=="your_project_name") | .id')
+
+          # ارسال متغیرهای محیطی به Vercel
+          for key in FLASK_SECRET DATABASE_URL ETH_RPC_URL BSC_RPC_URL TON_RPC_URL TON_API_KEY USDT_ETH_CONTRACT USDT_TON_CONTRACT TELEGRAM_BOT_TOKEN CELERY_BROKER_URL TON_MERCHANT_WALLET ETH_MERCHANT_WALLET; do
+            value="${!key}"
+            curl -X POST "https://api.vercel.com/v9/projects/$PROJECT_ID/env" \
+              -H "Authorization: Bearer $VERCEL_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"key\": \"$key\",
+                \"value\": \"$value\",
+                \"target\": [\"production\", \"preview\"]
+              }"
+          done

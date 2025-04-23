@@ -1,0 +1,99 @@
+name: CI/CD Payment System
+
+on:
+  push:
+    branches: [ System-payment ]
+  pull_request:
+    branches: [ System-payment ]
+
+jobs:
+  test_and_build:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Create .env file from Secrets
+        run: |
+          touch .env
+          echo "FLASK_SECRET=${{ secrets.FLASK_SECRET }}" >> .env
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env
+          echo "ETH_RPC_URL=${{ secrets.ETH_RPC_URL }}" >> .env
+          echo "BSC_RPC_URL=${{ secrets.BSC_RPC_URL }}" >> .env
+          echo "TON_RPC_URL=${{ secrets.TON_RPC_URL }}" >> .env
+          echo "TON_API_KEY=${{ secrets.TON_API_KEY }}" >> .env
+          echo "USDT_ETH_CONTRACT=${{ secrets.USDT_ETH_CONTRACT }}" >> .env
+          echo "USDT_TON_CONTRACT=${{ secrets.USDT_TON_CONTRACT }}" >> .env
+          echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" >> .env
+          echo "CELERY_BROKER_URL=${{ secrets.CELERY_BROKER_URL }}" >> .env
+          echo "TON_MERCHANT_WALLET=${{ secrets.TON_MERCHANT_WALLET }}" >> .env
+          echo "ETH_MERCHANT_WALLET=${{ secrets.ETH_MERCHANT_WALLET }}" >> .env
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest black flake8
+
+      - name: Auto-format code with Black
+        run: black .
+
+      - name: Check if any changes after Black
+        id: git_diff
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit formatting changes
+        if: steps.git_diff.outputs.changes == 'true' && github.event_name == 'push'
+        uses: EndBug/add-and-commit@v9
+        with:
+          add: '.'
+          message: 'Apply Black auto-formatting'
+          branch: System-payment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Flake8 linting
+        run: |
+          flake8 --ignore=F401,F841 .
+
+      - name: Run tests with pytest
+        run: |
+          if ls tests/*.py 1> /dev/null 2>&1; then
+            pytest --maxfail=1 --disable-warnings -q
+          else
+            echo "No tests found, skipping pytest."
+          fi
+
+      - name: Install Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
+
+      - name: Build Docker image for Payment System
+        run: docker build . -t payment-system
+
+      - name: Run Docker Compose for integration testing
+        run: |
+          docker compose up --build -d
+          sleep 10  # تاخیر برای راه‌اندازی سرویس‌ها
+          docker compose ps
+
+      - name: Tear down Docker Compose services
+        if: always()
+        run: docker compose down
