@@ -1,21 +1,14 @@
-from flask_socketio import SocketIO, join_room
-from flask import request
-from app.models import User
-from app.core import db
+import json
+import requests
 
-socketio = SocketIO(cors_allowed_origins=["https://daimonium.ir"])
-
+RENDER_WS_URL = 'https://websocket-on-render.com/api/notify'  # لینک REST API روی WebSocket Render
 
 def notify_user(user_id, new_balance):
-    socketio.emit(
-        "balance_update",
-        {"userId": user_id, "newBalance": new_balance},
-        room=str(user_id),
-    )
-
-
-@socketio.on("connect")
-def handle_connect():
-    user_id = request.args.get("userId")
-    if user_id:
-        join_room(user_id)
+    payload = {
+        "userId": user_id,
+        "newBalance": new_balance
+    }
+    try:
+        requests.post(RENDER_WS_URL, json=payload)
+    except Exception as e:
+        print(f"Error sending update to websocket server: {e}")
