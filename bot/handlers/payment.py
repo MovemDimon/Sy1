@@ -11,11 +11,13 @@ WS_URL = "wss://your-websocket-server.com"
 # مراحل مکالمه
 CURRENCY, NETWORK, WALLET = range(3)
 
+
 async def send_via_websocket(data: dict):
     async with websockets.connect(WS_URL) as websocket:
         await websocket.send(json.dumps(data))
         response = await websocket.recv()
         return json.loads(response)
+
 
 def start_payment(update: Update, context: CallbackContext) -> int:
     deeplink_data = context.args[0] if context.args else None
@@ -34,6 +36,7 @@ def start_payment(update: Update, context: CallbackContext) -> int:
     )
     return CURRENCY
 
+
 def select_network(update: Update, context: CallbackContext) -> int:
     context.user_data["currency"] = update.callback_query.data
     networks = (
@@ -49,10 +52,12 @@ def select_network(update: Update, context: CallbackContext) -> int:
     )
     return NETWORK
 
+
 def get_wallet(update: Update, context: CallbackContext) -> int:
     context.user_data["network"] = update.callback_query.data
     update.callback_query.edit_message_text("📨 لطفا آدرس کیف پول خود را وارد کنید:")
     return WALLET
+
 
 def process_payment(update: Update, context: CallbackContext) -> int:
     context.user_data["wallet"] = update.message.text
@@ -68,11 +73,10 @@ def process_payment(update: Update, context: CallbackContext) -> int:
 
     asyncio.create_task(handle_ws(update, payload))
 
-    update.message.reply_text(
-        "⏳ در حال پردازش پرداخت شما هستیم... لطفاً شکیبا باشید."
-    )
+    update.message.reply_text("⏳ در حال پردازش پرداخت شما هستیم... لطفاً شکیبا باشید.")
 
     return ConversationHandler.END
+
 
 async def handle_ws(update: Update, payload: dict):
     try:
