@@ -1,13 +1,21 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext, ConversationHandler
-import requests
 import json
 import base64
-from app.core.app_core_config import Config  # ایمپورت تنظیمات
+import asyncio
+import websockets
+
+# WebSocket تنظیمات
+WS_URL = "wss://your-websocket-server.com"
 
 # مراحل مکالمه
 CURRENCY, NETWORK, WALLET = range(3)
 
+async def send_via_websocket(data: dict):
+    async with websockets.connect(WS_URL) as websocket:
+        await websocket.send(json.dumps(data))
+        response = await websocket.recv()
+        return json.loads(response)
 
 def start_payment(update: Update, context: CallbackContext) -> int:
     deeplink_data = context.args[0] if context.args else None
@@ -16,7 +24,6 @@ def start_payment(update: Update, context: CallbackContext) -> int:
         decoded_data = json.loads(base64.b64decode(encoded_data).decode())
         context.user_data["package"] = decoded_data
 
-    # نمایش انتخاب ارز
     keyboard = [
         [InlineKeyboardButton("USDT", callback_data="USDT")],
         [InlineKeyboardButton("TON", callback_data="TON")],
@@ -26,7 +33,6 @@ def start_payment(update: Update, context: CallbackContext) -> int:
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
     return CURRENCY
-
 
 def select_network(update: Update, context: CallbackContext) -> int:
     context.user_data["currency"] = update.callback_query.data
@@ -43,32 +49,39 @@ def select_network(update: Update, context: CallbackContext) -> int:
     )
     return NETWORK
 
-
 def get_wallet(update: Update, context: CallbackContext) -> int:
     context.user_data["network"] = update.callback_query.data
     update.callback_query.edit_message_text("📨 لطفا آدرس کیف پول خود را وارد کنید:")
     return WALLET
 
-
 def process_payment(update: Update, context: CallbackContext) -> int:
     context.user_data["wallet"] = update.message.text
 
-    # ارسال درخواست به سرور
-    response = requests.post(
-        "https://daimonium.ir/api/v1/process-payment",
-        headers={"Authorization": f"Bearer {Config.TELEGRAM_BOT_TOKEN}"},
-        json={
-            "user_id": context.user_data["package"]["userId"],
-            "amount": context.user_data["package"]["usdPrice"],
-            **context.user_data,
-        },
+    payload = {
+        "action": "start_payment",
+        "user_id": context.user_data["package"]["userId"],
+        "amount": context.user_data["package"]["usdPrice"],
+        "currency": context.user_data["currency"],
+        "network": context.user_data["network"],
+        "wallet": context.user_data["wallet"],
+    }
+
+    asyncio.create_task(handle_ws(update, payload))
+
+    update.message.reply_text(
+        "⏳ در حال پردازش پرداخت شما هستیم... لطفاً شکیبا باشید."
     )
 
-    if response.status_code == 202:
-        update.message.reply_text(
-            f'✅ تراکنش شما با شناسه {response.json()["tx_hash"]} ثبت شد!'
-        )
-    else:
-        update.message.reply_text("❌ خطا در پردازش پرداخت!")
-
     return ConversationHandler.END
+
+async def handle_ws(update: Update, payload: dict):
+    try:
+        response = await send_via_websocket(payload)
+        if response.get("status") == "success":
+            await update.message.reply_text(
+                f'✅ تراکنش شما با شناسه {response["tx_hash"]} ثبت شد!'
+            )
+        else:
+            await update.message.reply_text("❌ خطا در پردازش پرداخت!")
+    except Exception as e:
+        await update.message.reply_text(f"❌ خطای اتصال: {str(e)}")
