@@ -5,6 +5,7 @@ class Config:
     # کلیدهای امنیتی و آدرس پایگاه‌داده
     SECRET_KEY = os.getenv("FLASK_SECRET")
     DATABASE_URL = os.getenv("DATABASE_URL")
+    WS_URL = os.getenv("WS_URL", "wss://your-websocket-server.com")
 
     # RPC URLها و کلید API برای بلاک‌چین
     ETH_RPC_URL = os.getenv("ETH_RPC_URL")
