@@ -1,7 +1,13 @@
 import json
 from tonclient.client import TonClient
-from tonclient.types import ParamsOfEncodeMessage, Abi, ParamsOfSendMessage, ParamsOfWaitForTransaction
+from tonclient.types import (
+    ParamsOfEncodeMessage,
+    Abi,
+    ParamsOfSendMessage,
+    ParamsOfWaitForTransaction,
+)
 from app.core.config import Config  # از فایل config.py
+
 
 class TonProcessor:
     def __init__(self):
@@ -10,7 +16,7 @@ class TonProcessor:
             config={
                 "network": {
                     "server_address": Config.TON_RPC_URL,
-                    "api_key":        Config.TON_API_KEY,
+                    "api_key": Config.TON_API_KEY,
                 }
             }
         )
@@ -24,15 +30,24 @@ class TonProcessor:
         ساختار پیام برای فراخوانی تابع transfer در قرارداد.
         """
         return {
-            "address":       self.contract_address,
+            "address": self.contract_address,
             "function_name": "transfer",
             "input": {
-                "to":     receiver,
-                "amount": str(amount)  # برخی قراردادها مقدار را به صورت رشته انتظار دارند
-            }
+                "to": receiver,
+                "amount": str(
+                    amount
+                ),  # برخی قراردادها مقدار را به صورت رشته انتظار دارند
+            },
         }
 
-    def send_transaction(self, transaction_id: str, destination: str, amount: int, fee: int, signature: str) -> str:
+    def send_transaction(
+        self,
+        transaction_id: str,
+        destination: str,
+        amount: int,
+        fee: int,
+        signature: str,
+    ) -> str:
         """
         ارسال تراکنش به شبکه TON:
         - امضای داده‌ها در لایهٔ بالاتر ایجاد شده و اینجا تنها payload اصلی قرارداد ارسال می‌شود.
@@ -42,25 +57,22 @@ class TonProcessor:
         msg = self.create_message(destination, amount)
         # encode کردن پیام
         encode_params = ParamsOfEncodeMessage(
-            abi=            self.contract_abi,
+            abi=self.contract_abi,
             signer=None,  # چون قرارداد از کلید خودکار استفاده می‌کند
             address=None,
             deploy_set=None,
-            call_set=msg
+            call_set=msg,
         )
         encoded = self.client.abi.encode_message(params=encode_params)
         # ارسال پیام
-        send_params = ParamsOfSendMessage(
-            message=encoded.message,
-            send_events=False
-        )
+        send_params = ParamsOfSendMessage(message=encoded.message, send_events=False)
         result = self.client.net.send_message(params=send_params)
         # می‌توانیم منتظر تایید اولیه هم بمانیم
         wait_params = ParamsOfWaitForTransaction(
-            abi=            self.contract_abi,
-            message=        encoded.message,
+            abi=self.contract_abi,
+            message=encoded.message,
             shard_block_id=None,
-            send_events=False
+            send_events=False,
         )
         tx = self.client.net.wait_for_transaction(params=wait_params)
         # بازگرداندن شناسه تراکنش
@@ -73,14 +85,16 @@ class TonProcessor:
         """
         try:
             params = ParamsOfWaitForTransaction(
-                abi=            self.contract_abi,
-                message=        None,
+                abi=self.contract_abi,
+                message=None,
                 shard_block_id=None,
                 send_events=False,
-                wait_timeout=30_000  # میلی‌ثانیه
+                wait_timeout=30_000,  # میلی‌ثانیه
             )
             # اگر تراکنش با tx_hash در بلاک‌چین پیدا شود، موفقیت‌آمیز است
-            self.client.net.wait_for_transaction(params={**params, "transaction_id": tx_hash})
+            self.client.net.wait_for_transaction(
+                params={**params, "transaction_id": tx_hash}
+            )
             return True
         except Exception:
             return False
