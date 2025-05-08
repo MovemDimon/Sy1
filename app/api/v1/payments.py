@@ -10,13 +10,14 @@ from app.api.v1.notifications import send_telegram_notification
 
 payments_bp = Blueprint("payments", __name__)
 
+
 @payments_bp.route("/api/v1/payments", methods=["POST"])
 @jwt_required()
 def create_payment():
     data = request.get_json() or {}
-    dest       = data.get("destination_address")
-    gateway    = data.get("gateway")
-    currency   = data.get("currency")
+    dest = data.get("destination_address")
+    gateway = data.get("gateway")
+    currency = data.get("currency")
     package_id = data.get("package_id")
     if not all([dest, gateway, currency, package_id]):
         abort(400, description="Missing required fields")
@@ -35,7 +36,7 @@ def create_payment():
         gateway=gateway,
         currency=currency,
         amount=amount,
-        status="pending"
+        status="pending",
     )
     db.session.add(tx)
     db.session.commit()
@@ -45,10 +46,7 @@ def create_payment():
 
     # امضای دیجیتال
     signature = SignatureService.sign(
-        transaction_id=tx_id,
-        destination=dest,
-        amount=amount,
-        fee=fee
+        transaction_id=tx_id, destination=dest, amount=amount, fee=fee
     )
 
     # ارسال تراکنش
@@ -58,7 +56,7 @@ def create_payment():
             destination=dest,
             amount=amount,
             fee=fee,
-            signature=signature
+            signature=signature,
         )
     except Exception as e:
         tx.status = "failed"
@@ -67,15 +65,16 @@ def create_payment():
 
     # بروزرسانی وضعیت و ذخیره هش
     tx.tx_hash = tx_hash
-    tx.status  = "submitted"
+    tx.status = "submitted"
     db.session.commit()
 
-    return jsonify({
-        "transaction_id": tx_id,
-        "tx_hash":        tx_hash,
-        "amount":         amount,
-        "fee":            fee
-    }), 202
+    return (
+        jsonify(
+            {"transaction_id": tx_id, "tx_hash": tx_hash, "amount": amount, "fee": fee}
+        ),
+        202,
+    )
+
 
 @payments_bp.route("/api/v1/payments/execute", methods=["POST"])
 @jwt_required()
@@ -93,25 +92,28 @@ def execute_payment():
         abort(502, description=str(e))
     return jsonify({"status": tx.status}), 200
 
+
 @payments_bp.route("/api/v1/payments/callback", methods=["POST"])
 def payments_callback():
     data = request.get_json() or {}
     if not SignatureService.verify_callback(data):
         abort(401, description="Invalid signature")
 
-    tx = Transaction.query.filter_by(transaction_id=data.get("transaction_id")).first_or_404()
-    tx.status        = data.get("status")
-    tx.tx_hash       = data.get("tx_hash", tx.tx_hash)
+    tx = Transaction.query.filter_by(
+        transaction_id=data.get("transaction_id")
+    ).first_or_404()
+    tx.status = data.get("status")
+    tx.tx_hash = data.get("tx_hash", tx.tx_hash)
     tx.confirm_count = data.get("confirm_count", tx.confirm_count)
     tx.error_message = data.get("error_message", tx.error_message)
     db.session.commit()
 
     send_telegram_notification(
-        chat_id        = tx.user_id,
-        transaction_id = tx.transaction_id,
-        status         = tx.status,
-        tx_hash        = tx.tx_hash,
-        confirm_count  = tx.confirm_count,
-        error_message  = tx.error_message
+        chat_id=tx.user_id,
+        transaction_id=tx.transaction_id,
+        status=tx.status,
+        tx_hash=tx.tx_hash,
+        confirm_count=tx.confirm_count,
+        error_message=tx.error_message,
     )
-    return ('', 204)
+    return ("", 204)
